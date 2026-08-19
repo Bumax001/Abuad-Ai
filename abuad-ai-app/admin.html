@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ABUAD AI — Admin</title>
+<meta name="theme-color" content="#152A6B">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f4f6fa;color:#172033}
+header{background:#152A6B;color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center}
+main{max-width:1000px;margin:28px auto;padding:0 16px}.card{background:#fff;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 8px 30px #17203312}
+h1,h2{margin:0 0 8px}.muted{color:#68738a}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,button{font:inherit}input[type=password]{flex:1;min-width:220px;padding:12px;border:1px solid #ccd3df;border-radius:10px}
+button{border:0;border-radius:10px;padding:11px 15px;background:#152A6B;color:#fff;cursor:pointer;font-weight:700}button.danger{background:#b3132b}button.secondary{background:#e9edf4;color:#172033}
+.drop{border:2px dashed #cbd3df;padding:24px;border-radius:14px;text-align:center}.doc{display:flex;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid #edf0f5}.pill{padding:5px 9px;border-radius:99px;background:#eaf7ef;color:#176a38;font-size:12px;font-weight:700}
+#status{margin-top:10px}.error{color:#b3132b}.ok{color:#176a38}
+@media(max-width:600px){.doc{align-items:flex-start;flex-direction:column}header{padding:15px}}
+</style></head>
+<body>
+<header><div><strong>ABUAD AI</strong><div style="opacity:.8;font-size:12px">Knowledge Management</div></div><a href="index.html" style="color:#fff">← Student app</a></header>
+<main>
+<section class="card">
+<h1>Admin Console</h1><p class="muted">Upload official ABUAD PDFs, rebuild the knowledge index, and keep the assistant grounded.</p>
+<div class="row"><input id="key" type="password" placeholder="Admin key"><button id="save">Unlock</button><span id="status"></span></div>
+</section>
+<section class="card" id="panel" style="display:none">
+<h2>Knowledge base</h2><p id="stats" class="muted">Loading…</p>
+<div class="drop"><input id="file" type="file" accept="application/pdf"><button id="upload">Upload & index</button><button class="secondary" id="refresh">Refresh</button></div>
+<div id="docs"></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s), keyEl=$('#key'), status=$('#status'), panel=$('#panel');
+let key=sessionStorage.getItem('abuad_admin_key')||'';
+if(key) unlock();
+$('#save').onclick=()=>{key=keyEl.value.trim();if(!key)return;sessionStorage.setItem('abuad_admin_key',key);unlock()};
+async function api(path,opt={}){opt.headers={...(opt.headers||{}),'X-Admin-Key':key};const r=await fetch(path,opt);const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.detail||'Request failed');return d}
+async function unlock(){try{await api('/api/knowledge/status');panel.style.display='block';status.className='ok';status.textContent='Unlocked';load()}catch(e){status.className='error';status.textContent='Invalid key or backend unavailable'}}
+async function load(){try{const s=await api('/api/knowledge/status');$('#stats').innerHTML=`<span class="pill">${s.documents} documents</span> <span class="pill">${s.chunks} searchable chunks</span> ${s.last_indexed?'Indexed '+new Date(s.last_indexed).toLocaleString():''}`;const d=await api('/api/admin/documents');$('#docs').innerHTML=d.documents.length?d.documents.map(x=>`<div class="doc"><div><b>${esc(x.name)}</b><div class="muted">${(x.size/1024/1024).toFixed(2)} MB</div></div><button class="danger" onclick="removeDoc('${escAttr(x.name)}')">Delete</button></div>`).join(''):'<p class="muted">No PDFs uploaded yet.</p>'}catch(e){status.className='error';status.textContent=e.message}}
+$('#refresh').onclick=load;
+$('#upload').onclick=async()=>{const f=$('#file').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);status.className='';status.textContent='Uploading and indexing…';try{await api('/api/admin/documents/upload',{method:'POST',body:fd});status.className='ok';status.textContent='Uploaded successfully';$('#file').value='';load()}catch(e){status.className='error';status.textContent=e.message}};
+async function removeDoc(n){if(!confirm('Delete '+n+'?'))return;try{await api('/api/admin/documents/'+encodeURIComponent(n),{method:'DELETE'});load()}catch(e){status.className='error';status.textContent=e.message}}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function escAttr(s){return esc(s).replace(/'/g,'&#39;')}
+</script></body></html>

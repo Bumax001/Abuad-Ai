@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+backend/.env
+backend/.venv/
+backend/abuad.db
+backend/knowledge_index.json
+node_modules/
+dist/
+.DS_Store
